@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>JARVIS Agent</title>
+<meta name="theme-color" content="#050b14"><meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{--bg:#050b14;--panel:#0b1626;--line:#16324d;--txt:#d6ecff;--dim:#6f8da8;--acc:#19e6c1;--red:#ff4d5e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root:not([data-theme="light"]){color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#e9f1f8;--panel:#fff;--line:#b7cbdc;--txt:#0c2236;--dim:#4d6a82;--acc:#00a88a;color-scheme:light}}
+:root[data-theme="dark"]{--bg:#050b14}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--txt);font:14px/1.45 system-ui,Segoe UI,Roboto,sans-serif;display:grid;grid-template-columns:260px 1fr 340px;gap:10px;padding:10px;overflow:hidden}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;min-height:0;display:flex;flex-direction:column}
+h3{margin:0 0 8px;font-size:11px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase}
+#center{display:grid;grid-template-rows:1fr auto;gap:10px;min-height:0}
+#orbbox{position:relative;align-items:center;justify-content:center}
+canvas{width:100%;height:100%;display:block}
+#nodes{position:absolute;left:12px;top:12px;display:flex;flex-direction:column;gap:8px}
+.node{border:1px solid var(--acc);color:var(--acc);border-radius:8px;padding:6px 12px;font-size:11px;letter-spacing:.15em;background:transparent;cursor:pointer;text-align:left}
+.node.on{background:var(--acc);color:#04131a}
+#status{position:absolute;bottom:14px;left:0;right:0;text-align:center;font-size:11px;letter-spacing:.25em;color:var(--acc)}
+#term{position:absolute;top:12px;right:12px;border:1px solid var(--red);color:var(--red);background:transparent;border-radius:20px;padding:6px 14px;font-size:11px;letter-spacing:.2em;cursor:pointer}
+#info{height:200px;overflow:auto;font-size:13px}
+#info b{color:var(--acc)}
+#log{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
+.m{padding:8px 10px;border-radius:10px;max-width:92%;white-space:pre-wrap;word-wrap:break-word}
+.u{align-self:flex-end;background:#0e3a4a;color:#d6ecff;border:1px solid var(--line)}
+.a{align-self:flex-start;background:transparent;border:1px solid var(--line)}
+.who{font-size:10px;letter-spacing:.2em;color:var(--dim);margin-bottom:2px}
+#bar{display:flex;gap:6px;margin-top:8px}
+#inp{flex:1;min-width:0;background:transparent;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:10px;font:inherit}
+.btn{background:var(--acc);color:#04131a;border:0;border-radius:10px;padding:0 14px;font-weight:700;cursor:pointer}
+#mic.rec{background:var(--red);color:#fff}
+#sys div{padding:5px 0;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+.tabs{display:flex;gap:6px;margin-bottom:8px;flex:none}.tab{background:transparent;border:1px solid var(--line);color:var(--dim);border-radius:8px;padding:3px 10px;font-size:10px;letter-spacing:.15em;cursor:pointer}.tab.on{color:var(--acc);border-color:var(--acc)}
+#lines{position:absolute;inset:0;pointer-events:none;width:100%;height:100%}
+#lines path{fill:none;stroke:var(--acc);stroke-width:1.2;stroke-dasharray:6 6;animation:fl 1s linear infinite;opacity:.6}@keyframes fl{to{stroke-dashoffset:-12}}
+#map{width:100%;height:120px;border:1px solid var(--line);border-radius:10px;margin-bottom:8px;flex:none}
+#sys{overflow:auto;flex:1}#off{width:100%;height:120px;image-rendering:pixelated;object-fit:contain;display:none}
+#intel{display:none;font-size:12px;overflow:auto;height:120px}#intel div{padding:4px 0;border-bottom:1px solid var(--line)}
+#act,#notes{display:none;flex:1;overflow:auto;font-size:12px;color:var(--dim)}#notes{width:100%;background:transparent;border:1px solid var(--line);color:var(--txt);border-radius:10px;padding:8px;font:inherit;resize:none}
+#be{width:100%;background:transparent;border:1px solid var(--line);color:var(--txt);border-radius:8px;padding:6px;font:inherit}
+@media(max-width:820px){body{grid-template-columns:1fr;grid-template-rows:42vh 1fr;overflow:auto;height:auto;min-height:100%}
+#left{display:none}#center{grid-template-rows:1fr}#info{display:none}#chat{min-height:55vh}}
+</style></head><body>
+<div class="card" id="left"><h3>Global map</h3><canvas id="map"></canvas><h3>System feed</h3><div id="sys"></div></div>
+
+<div id="center">
+ <div class="card" id="orbbox">
+  <canvas id="cv"></canvas><svg id="lines"></svg>
+  <div id="nodes">
+   <button class="node on" data-k="memory">MEMORY</button>
+   <button class="node" data-k="skills">SKILLS</button>
+   <button class="node" data-k="monitor">MONITOR</button>
+   <button class="node" data-k="settings">SETTINGS</button>
+  </div>
+  <button id="term">TERMINATE</button>
+  <div id="status">STANDBY</div>
+ </div>
+ <div class="card" id="info"><div class="tabs"><button class="tab on" data-t="info">PANEL</button><button class="tab" data-t="intel">INTEL</button><button class="tab" data-t="office">OFFICE</button></div><div id="ibody" style="overflow:auto;flex:1"></div><div id="intel"></div><canvas id="off"></canvas></div>
+</div>
+
+<div class="card" id="chat">
+ <div class="tabs"><button class="tab on" data-c="chat">CHAT</button><button class="tab" data-c="act">ACTIVITY</button><button class="tab" data-c="notes">NOTES</button></div>
+ <div id="log"></div><div id="act"></div><textarea id="notes" placeholder="Your notes (saved on this device)"></textarea>
+ <div id="bar">
+  <input id="inp" placeholder="Type to Assistant..." autocomplete="off">
+  <button class="btn" id="mic" title="Voice">🎤</button>
+  <button class="btn" id="send">➤</button>
+ </div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s);
+const st={voice:true,mem:[],busy:false};
+try{st.mem=JSON.parse(localStorage.getItem("jv_mem")||"[]");}catch(e){}
+const saveMem=()=>{try{localStorage.setItem("jv_mem",JSON.stringify(st.mem));}catch(e){}};
+
+/* ---------- ORB ---------- */
+const cv=$("#cv"),cx=cv.getContext("2d");let W,H,pts=[],speed=.004,pulse=0;
+function rs(){W=cv.width=cv.clientWidth*devicePixelRatio;H=cv.height=cv.clientHeight*devicePixelRatio}
+addEventListener("resize",rs);rs();
+for(let i=0;i<500;i++){const a=Math.acos(2*Math.random()-1),b=Math.random()*6.283;pts.push([Math.sin(a)*Math.cos(b),Math.cos(a),Math.sin(a)*Math.sin(b)])}
+let rot=0;
+function draw(){
+ cx.clearRect(0,0,W,H);rot+=speed;pulse*=.95;
+ const R=Math.min(W,H)*.26*(1+pulse*.12),c=Math.cos(rot),s=Math.sin(rot);
+ const g=cx.createRadialGradient(W/2,H/2,0,W/2,H/2,R*1.6);
+ g.addColorStop(0,"rgba(25,230,193,.35)");g.addColorStop(1,"rgba(25,230,193,0)");
+ cx.fillStyle=g;cx.fillRect(0,0,W,H);
+ for(const p of pts){const x=p[0]*c-p[2]*s,z=p[0]*s+p[2]*c,k=(z+1.5)/2.5;
+  cx.fillStyle=`rgba(80,255,225,${.2+.8*k})`;
+  cx.fillRect(W/2+x*R,H/2+p[1]*R,1.8*k*devicePixelRatio,1.8*k*devicePixelRatio)}
+ requestAnimationFrame(draw)}
+draw();
+const setStatus=(t,sp)=>{$("#status").textContent=t;speed=sp||.004;pulse=sp?1:0};
+
+/* ---------- LOG ---------- */
+function add(role,text){
+ const d=document.createElement("div");d.className="m "+(role==="u"?"u":"a");
+ d.innerHTML='<div class="who">'+(role==="u"?"YOU":"JARVIS")+'</div><span></span>';
+ d.lastChild.textContent=text;$("#log").appendChild(d);$("#log").scrollTop=1e9;return d.lastChild}
+function sys(t){const d=document.createElement("div");d.textContent=new Date().toLocaleTimeString()+"  "+t;$("#sys").prepend(d)}
+
+/* ---------- PANELS ---------- */
+function panel(k){
+ document.querySelectorAll(".node").forEach(n=>n.classList.toggle("on",n.dataset.k===k));
+ const i=$("#ibody");showTab("info");
+ if(k==="memory")i.innerHTML="<h3>Memory</h3>"+(st.mem.length?st.mem.map(m=>"• "+m).join("<br>"):"Empty. Say: <b>remember that I like cricket</b>");
+ if(k==="skills")i.innerHTML="<h3>Skills</h3>• <b>time / date</b><br>• <b>remember …</b> / <b>forget all</b><br>• <b>open youtube / google</b><br>• <b>search for …</b><br>• anything else → AI brain";
+ if(k==="monitor")i.innerHTML="<h3>Monitor</h3>Online: "+navigator.onLine+"<br>Messages: "+$("#log").children.length+"<br>Memory items: "+st.mem.length+"<br>Voice: "+(st.voice?"on":"off");
+ if(k==="settings")i.innerHTML='<h3>Settings</h3><label><input type="checkbox" id="vc" '+(st.voice?"checked":"")+'> Speak replies</label><br><br>Backend URL<br><input id="be" placeholder="https://your-app.onrender.com" value="'+BACKEND+'"><br><button class="node" id="cl" style="margin-top:8px">CLEAR CHAT</button>';
+ if(k==="settings"){$("#be").onchange=e=>{BACKEND=e.target.value.trim().replace(/\/$/,"");try{localStorage.setItem("jv_be",BACKEND)}catch(x){}sys("backend saved")};$("#vc").onchange=e=>{st.voice=e.target.checked;sys("voice "+(st.voice?"on":"off"))};$("#cl").onclick=()=>{$("#log").innerHTML="";sys("chat cleared")}}
+}
+document.querySelectorAll(".node").forEach(n=>n.onclick=()=>panel(n.dataset.k));panel("memory");
+
+/* ---------- VOICE ---------- */
+function speak(t){
+ if(!st.voice||!window.speechSynthesis)return;
+ speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);
+ u.onstart=()=>setStatus("SPEAKING",.03);u.onend=()=>setStatus("STANDBY");speechSynthesis.speak(u)}
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec=null;
+$("#mic").onclick=()=>{
+ if(!SR){add("a","Voice input is not supported in this browser. Try Chrome.");return}
+ if(rec){rec.stop();return}
+ rec=new SR();rec.lang="en-IN";rec.interimResults=false;
+ rec.onstart=()=>{$("#mic").classList.add("rec");setStatus("LISTENING",.015)};
+ rec.onresult=e=>{const t=e.results[0][0].transcript;$("#inp").value=t;send(t)};
+ rec.onerror=()=>{};rec.onend=()=>{rec=null;$("#mic").classList.remove("rec");if(!st.busy)setStatus("STANDBY")};
+ rec.start()};
+
+/* ---------- BRAIN ---------- */
+function local(q){
+ const l=q.toLowerCase().trim();let m;
+ if(/\b(time)\b/.test(l))return"It is "+new Date().toLocaleTimeString()+".";
+ if(/\b(date|today)\b/.test(l)&&!/search/.test(l))return"Today is "+new Date().toLocaleDateString(undefined,{weekday:"long",year:"numeric",month:"long",day:"numeric"})+".";
+ if(m=l.match(/^remember (?:that )?(.+)/)){st.mem.push(m[1]);saveMem();panel("memory");return"Saved to memory: "+m[1]}
+ if(/forget all/.test(l)){st.mem=[];saveMem();panel("memory");return"Memory cleared."}
+ if(m=l.match(/^open (youtube|google)/)){const u=m[1]==="youtube"?"https://www.youtube.com":"https://www.google.com";window.open(u,"_blank");return"Opening "+m[1]+"."}
+ if(m=l.match(/^search (?:for )?(.+)/)){window.open("https://www.google.com/search?q="+encodeURIComponent(m[1]),"_blank");return"Searching for "+m[1]+"."}
+ return null}
+/* Put your deployed backend link here (no slash at the end) */
+let BACKEND=(()=>{try{return localStorage.getItem("jv_be")}catch(e){}})()||"http://localhost:5000";
+async function brain(q){
+ const r=local(q);if(r)return r;
+ try{
+  const hist=[...$("#log").querySelectorAll(".m")].slice(-10).map(d=>({role:d.classList.contains("u")?"user":"assistant",content:d.lastChild.textContent})).filter(h=>h.content&&h.content!=="…");
+  while(hist.length&&hist[0].role!=="user")hist.shift();
+  const res=await fetch(BACKEND+"/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({messages:hist,memory:st.mem})});
+  const j=await res.json();
+  return j.text||j.error||"No reply.";
+ }catch(e){return"Cannot reach my brain server. Is app.py running and is BACKEND correct?"}}
+
+async function send(text){
+ text=(text||$("#inp").value).trim();if(!text||st.busy)return;
+ $("#inp").value="";add("u",text);st.busy=true;setStatus("THINKING",.02);sys("query: "+text.slice(0,30));
+ const spot=add("a","…");
+ const ans=await brain(text);spot.textContent=ans;st.busy=false;setStatus("STANDBY");speak(ans);sys("reply sent")}
+$("#send").onclick=()=>send();$("#inp").addEventListener("keydown",e=>{if(e.key==="Enter")send()});
+$("#term").onclick=()=>{speechSynthesis&&speechSynthesis.cancel();setStatus("TERMINATED");sys("terminated");setTimeout(()=>setStatus("STANDBY"),1500)};
+
+/* ---------- TABS ---------- */
+function showTab(t){document.querySelectorAll("#info .tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+ $("#ibody").style.display=t==="info"?"block":"none";$("#intel").style.display=t==="intel"?"block":"none";$("#off").style.display=t==="office"?"block":"none"}
+document.querySelectorAll("#info .tab").forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+function ctab(t){document.querySelectorAll("#chat .tab").forEach(b=>b.classList.toggle("on",b.dataset.c===t));
+ $("#log").style.display=t==="chat"?"flex":"none";$("#bar").style.display=t==="chat"?"flex":"none";
+ $("#act").style.display=t==="act"?"block":"none";$("#notes").style.display=t==="notes"?"block":"none";
+ if(t==="act")$("#act").innerHTML=$("#sys").innerHTML}
+document.querySelectorAll("#chat .tab").forEach(b=>b.onclick=()=>ctab(b.dataset.c));
+try{$("#notes").value=localStorage.getItem("jv_notes")||""}catch(e){}
+$("#notes").oninput=e=>{try{localStorage.setItem("jv_notes",e.target.value)}catch(x){}};
+
+/* ---------- LINES (nodes to orb) ---------- */
+function lines(){const b=$("#orbbox").getBoundingClientRect(),R=Math.min(b.width,b.height)*.26,X=b.width/2,Y=b.height/2;let d="";
+ document.querySelectorAll(".node").forEach((n,i)=>{const r=n.getBoundingClientRect(),x=r.right-b.left,y=r.top+r.height/2-b.top;
+  d+='<path d="M'+x+' '+y+' H'+(x+24+i*16)+' V'+(Y+(i-1.5)*12)+' H'+(X-R)+'"/>'});$("#lines").innerHTML=d}
+addEventListener("resize",lines);setTimeout(lines,50);
+
+/* ---------- MAP ---------- */
+const mp=$("#map"),mx=mp.getContext("2d"),spots=[];
+function mapDraw(){if(!mp.clientWidth)return;mp.width=mp.clientWidth;mp.height=mp.clientHeight;
+ mx.fillStyle="#0a2236";for(let x=6;x<mp.width;x+=8)for(let y=6;y<mp.height;y+=8)if((Math.sin(x*.07)+Math.cos(y*.11)+Math.sin((x+y)*.05))>.3)mx.fillRect(x,y,3,3);
+ const t=Date.now()/400;spots.forEach((p,i)=>{mx.fillStyle=i%3?"#ffb020":"#ff4d5e";mx.globalAlpha=.4+.6*Math.abs(Math.sin(t+i));mx.fillRect(p[0]*mp.width,p[1]*mp.height,4,4)});mx.globalAlpha=1}
+for(let i=0;i<14;i++)spots.push([Math.random(),Math.random()]);setInterval(mapDraw,300);
+
+/* ---------- OFFICE (pixel agents) ---------- */
+const oc=$("#off"),ox=oc.getContext("2d");oc.width=160;oc.height=64;
+const ag=[{x:20,y:30,c:"#19e6c1"},{x:60,y:20,c:"#ffb020"},{x:100,y:40,c:"#ff4d5e"},{x:130,y:25,c:"#7aa2ff"}];
+const desks=[[10,12],[50,8],[90,12],[125,10],[20,44],[70,46],[115,44]];
+setInterval(()=>{ox.fillStyle="#0b2236";ox.fillRect(0,0,160,64);ox.fillStyle="#12385a";for(let x=0;x<160;x+=16)ox.fillRect(x,0,1,64);
+ desks.forEach(d=>{ox.fillStyle="#2a4f73";ox.fillRect(d[0],d[1],20,8);ox.fillStyle="#19e6c1";ox.fillRect(d[0]+8,d[1]+1,4,3)});
+ ag.forEach(a=>{a.x=Math.max(2,Math.min(150,a.x+Math.random()*6-3));a.y=Math.max(14,Math.min(56,a.y+Math.random()*6-3));
+  ox.fillStyle=a.c;ox.fillRect(a.x,a.y,4,6);ox.fillStyle="#fde3c8";ox.fillRect(a.x,a.y-2,4,3)})},350);
+
+/* ---------- INTEL FEED (demo) ---------- */
+const hl=["All nodes nominal","Memory index updated","Voice channel calibrated","Backend link check passed","Skill library synced","Idle: awaiting command","Threat scan: 0 anomalies","Cache optimized"];
+function intel(){const d=document.createElement("div");d.textContent=new Date().toLocaleTimeString()+"  "+hl[Math.floor(Math.random()*hl.length)];$("#intel").prepend(d);if($("#intel").children.length>30)$("#intel").lastChild.remove()}
+for(let i=0;i<4;i++)intel();setInterval(intel,6000);
+
+/* ---------- PWA manifest ---------- */
+try{const l=document.createElement("link");l.rel="manifest";l.href=URL.createObjectURL(new Blob([JSON.stringify({name:"JARVIS",short_name:"JARVIS",display:"standalone",start_url:".",background_color:"#050b14",theme_color:"#050b14"})],{type:"application/json"}));document.head.appendChild(l)}catch(e){}
+add("a","Systems online. Type or tap the mic and talk to me.");sys("boot complete");
+</script></body></html>
